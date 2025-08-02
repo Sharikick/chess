@@ -1,30 +1,28 @@
 package main
 
 import (
-	"chess/internal/lib/logger"
-	"net/http"
-
-	"github.com/go-chi/chi/v5"
+	"chess/internal/app"
+	"context"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
-	logger := logger.New()
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// storage, err := psql.New("")
-	// if err != nil {
-	// 	logger.Error("Error during database initialization", slog.String("err", err.Error()))
-	// }
+	app, err := app.New()
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
 
-	r := chi.NewRouter()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
-	r.Route("/game", func(r chi.Router) {
-		r.Get("/new", func(w http.ResponseWriter, r *http.Request) {
-
-		})
-	})
-
-	logger.Info("Server started on port 8080")
-	if err := http.ListenAndServe(":8000", r); err != nil {
-		logger.Error(err.Error())
+	if err := app.Run(ctx); err != nil {
+		log.Error("Ошибка при запуске приложения", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
