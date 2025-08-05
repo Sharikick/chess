@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	app, err := app.New()
 	if err != nil {

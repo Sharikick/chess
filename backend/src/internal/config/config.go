@@ -1,55 +1,41 @@
 package config
 
 import (
-	"chess/internal/lib/env"
 	"fmt"
+	"os"
 )
 
-type (
-	HTTPConfig struct {
-		Host string
-		Port string
-	}
-
-	DatabaseConfig struct {
-		Host     string
-		Port     string
-		User     string
-		Password string
-		Name     string
-	}
-
-	LoggerConfig struct {
-		Level string
-	}
-
-	Config struct {
-		Database DatabaseConfig
-		Logger   LoggerConfig
-		HTTP     HTTPConfig
-	}
-)
-
-func (db DatabaseConfig) GetConn() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", db.User, db.Password, db.Host, db.Port, db.Name)
+type Config struct {
+	Database DatabaseConfig
+	Logger   LoggerConfig
+	HTTP     HTTPConfig
 }
 
-func New() (*Config, error) {
-	database := DatabaseConfig{
-		Host:     env.GetEnvAsString("DB_HOST", "database"),
-		Port:     env.GetEnvAsString("DB_PORT", "5432"),
-		User:     env.GetEnvAsString("DB_USER", "tsyden"),
-		Password: env.GetEnvAsString("DB_PASSWORD", "chess"),
-		Name:     env.GetEnvAsString("DB_DATABASe", "chess_db"),
+func New(isProd bool) (*Config, error) {
+	getEnv := func(key, defaultValue string) (string, error) {
+		if value, exists := os.LookupEnv(key); exists {
+			return value, nil
+		}
+
+		if isProd {
+			return "", fmt.Errorf("не задано значение для переменной: %s", key)
+		}
+		return defaultValue, nil
 	}
 
-	logger := LoggerConfig{
-		Level: env.GetEnvAsString("LOG_LEVEL", "INFO"),
+	database := DatabaseConfig{}
+	if err := database.fill(getEnv); err != nil {
+		return nil, err
 	}
 
-	http := HTTPConfig{
-		Host: env.GetEnvAsString("HTTP_HOST", "127.0.0.1"),
-		Port: env.GetEnvAsString("HTTP_PORT", "8080"),
+	logger := LoggerConfig{}
+	if err := logger.fill(getEnv); err != nil {
+		return nil, err
+	}
+
+	http := HTTPConfig{}
+	if err := http.fill(getEnv); err != nil {
+		return nil, err
 	}
 
 	return &Config{

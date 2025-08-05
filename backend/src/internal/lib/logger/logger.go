@@ -5,7 +5,6 @@ import (
 	"chess/internal/lib/buffer"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -89,32 +88,19 @@ func (h *DevHandler) WithGroup(name string) slog.Handler {
 	return h
 }
 
-func parseLevel(level string) (slog.Level, error) {
-	switch level {
-	case "DEBUG":
-		return slog.LevelDebug, nil
-	case "INFO":
-		return slog.LevelInfo, nil
-	case "WARN":
-		return slog.LevelWarn, nil
-	case "ERROR":
-		return slog.LevelError, nil
-	default:
-		return slog.LevelInfo, fmt.Errorf("Неправильно объявлен уровень лога: %s", level)
-	}
-}
-
-func New(config config.LoggerConfig) (*slog.Logger, error) {
-	level, err := parseLevel(config.Level)
-	if err != nil {
-		return nil, err
-	}
-
-	handler := &DevHandler{
-		w: os.Stdout,
-		opts: &DevHandlerOptions{
-			level: level,
-		},
+func New(config config.LoggerConfig, isProd bool) (*slog.Logger, error) {
+	var handler slog.Handler
+	if isProd {
+		handler = &DevHandler{
+			w: os.Stdout,
+			opts: &DevHandlerOptions{
+				level: config.Level,
+			},
+		}
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: config.Level,
+		})
 	}
 
 	return slog.New(handler), nil

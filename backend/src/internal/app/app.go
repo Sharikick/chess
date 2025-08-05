@@ -5,9 +5,11 @@ import (
 	"chess/internal/lib/logger"
 	"chess/internal/storage"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -23,12 +25,27 @@ type (
 )
 
 func New() (*Application, error) {
-	config, err := config.New()
+	mode, exists := os.LookupEnv("DEVELOPMENT")
+	if !exists {
+		return nil, errors.New("нужно указать переменную окружения DEVELOPMENT")
+	}
+
+	var isProd bool
+	switch mode {
+	case "dev":
+		isProd = false
+	case "prod":
+		isProd = true
+	default:
+		return nil, fmt.Errorf("указана неправильная переменная окружения DEVELOPMENT, %s", mode)
+	}
+
+	config, err := config.New(isProd)
 	if err != nil {
 		return nil, err
 	}
 
-	log, err := logger.New(config.Logger)
+	log, err := logger.New(config.Logger, isProd)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +65,14 @@ func New() (*Application, error) {
 func (app *Application) Run(ctx context.Context) error {
 	r := chi.NewRouter()
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello world"))
+	r.Route("/game", func(r chi.Router) {
+		r.Post("/create", func(w http.ResponseWriter, r *http.Request) {
+
+		})
 	})
 
 	srv := &http.Server{
-		Addr:         app.config.Host + ":" + app.config.Port,
+		Addr:         app.config.GetAddr(),
 		Handler:      r,
 		WriteTimeout: 30 * time.Second,
 		ReadTimeout:  10 * time.Second,
@@ -61,7 +80,7 @@ func (app *Application) Run(ctx context.Context) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		app.log.Info("Сервер запущен", slog.String("port", app.config.Port), slog.String("host", app.config.Host))
+		app.log.Info("Сервер запущен", slog.Int("port", app.config.Port), slog.String("host", app.config.Host))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- fmt.Errorf("ошибка при запуске сервера: %w", err)
 		}
